@@ -108,7 +108,7 @@ function AtualizareExtrair() {
   }
   catch (error) {
       Logger.log ("Erro durante a execução: "+error );
-      var slackUrl = "https://hooks.slack.com/services/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"
+      var slackUrl = "seu webhook do slack aqui"
       var payload = {
         "text": "Ocorreu um erro durante a execução do disparo automático: \n" + error,
         "icon_emoji": ":incoming_envelope:",
