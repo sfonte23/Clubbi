@@ -1,0 +1,126 @@
+function AtualizareExtrair() {
+  try{
+    var tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1); // Adicionar 1 dia para obter a data de amanhã
+    var feriadosSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Feriado"); //aba se chama feriado
+    var feriadosData = feriadosSheet.getRange("A2:A" + feriadosSheet.getLastRow()).getValues(); // Coloquei uma exceção para não fazer atualização e extração quando o dia seguinte for feriado.
+    var isTomorrowHoliday = false;
+   
+    for (var i = 0; i < feriadosData.length; i++) {
+      var feriadoDate = feriadosData[i][0];
+    
+      if (feriadoDate instanceof Date && tomorrow.getDate() === feriadoDate.getDate() && tomorrow.getMonth() === feriadoDate.getMonth() && tomorrow.getFullYear() === feriadoDate.getFullYear()) {
+        isTomorrowHoliday = true;
+        break;
+      }
+    } 
+  
+    // Abortar a execução se amanhã for feriado
+    if (isTomorrowHoliday) {
+      Logger.log("Não será feito o disparo, amanhã é feriado Nacional.");
+      return;
+    }
+    Logger.log("Amanhã não é Feriado Nacional") // Mensagem log de feriado
+ 
+    var REDASH_HOST = "x"; //link do redash
+    var QUERY_ID = y; //numero da querie
+    var API_KEY = "z"; // sua chave API
+
+    var headers = {
+      "Authorization": "Key " + API_KEY
+    };
+  
+    // Realiza uma solicitação POST para atualizar a query
+    var refreshResponse = UrlFetchApp.fetch(REDASH_HOST + "/api/queries/" + QUERY_ID + "/refresh", {
+      method: "post",
+      headers: headers
+    });
+
+    if (refreshResponse.getResponseCode() != 200) {
+      throw new Error("Atualização falhou.");
+    }
+
+    // Poll até que a atualização termine (pode variar de acordo com a implementação da API)
+    var job = refreshResponse.getContentText();
+    while (true) {
+      var jobResponse = UrlFetchApp.fetch(REDASH_HOST + "/api/jobs/" + JSON.parse(job).job.id, {
+        headers: headers
+      });
+      job = jobResponse.getContentText();
+      if (JSON.parse(job).job.status == 3) {
+        break;
+      }
+      Utilities.sleep(1000); // Aguarda 1 segundo antes de verificar novamente
+    }
+
+    // Obtém os resultados atualizados da query
+    var resultsResponse = UrlFetchApp.fetch(REDASH_HOST + "/api/queries/" + QUERY_ID + "/results.json", {
+      headers: headers
+    });
+
+    if (resultsResponse.getResponseCode() != 200) {
+      throw new Error("Falha ao obter os resultados.");
+    return;}
+
+    Logger.log("Atualização de Querie Realizada com Sucesso!");
+
+    var results = JSON.parse(resultsResponse.getContentText());
+    var redashUrl = "link parseado de extração em CSV do Redash"
+
+    // Abre a planilha ativa e a aba "Modelo", limpa o conteúdo
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = spreadsheet.getSheetByName("Modelo");
+    sheet.clearContents();
+  
+    // Realiza a solicitação à API do Redash
+    var response = UrlFetchApp.fetch(redashUrl);
+    var content = response.getContentText();
+    
+    // Faz o parsing do CSV recebido
+    var csvData = Utilities.parseCsv(content);
+    
+    // Importa todas as linhas
+    sheet.getRange(1, 1, csvData.length, csvData[0].length).setValues(csvData);
+
+    // Define a primeira linha em negrito
+    var boldRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+    boldRange.setFontWeight("bold");
+  
+    // Congela a primeira linha
+    sheet.setFrozenRows(1);
+
+    // Define a formatação de texto e alinhamento
+    var font = "Baloo 2";
+    var fontSize = 10;
+    var fontColor = "#000000"; // Cor preta em hexadecimal
+    var alignment = "center"; // Alinhamento ao centro
+
+    // Centraliza o cabeçalho
+    var headerRange = sheet.getRange(1, 1, 1, sheet.getLastColumn());
+    headerRange.setHorizontalAlignment("center");
+    Logger.log("CSV Atualizado com Sucesso!");
+
+    //Aqui deve-se usar em conjunto com outras funções que não estão nesse script.
+    //NotificarWhatsappCliente();
+     // Logger.log("Mensagens Enviadas!");
+    //enviarAlertaSlack();
+    //  Logger.log("Slack Notificado");
+  }
+  catch (error) {
+      Logger.log ("Erro durante a execução: "+error );
+      var slackUrl = "https://hooks.slack.com/services/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"
+      var payload = {
+        "text": "Ocorreu um erro durante a execução do disparo automático: \n" + error,
+        "icon_emoji": ":incoming_envelope:",
+        "username": "Régua Status do Pedido"
+      }
+      ;var options = {
+        "method": "post",
+        "contentType": "application/json",
+        "payload": JSON.stringify(payload),
+        "muteHttpExceptions": true
+    };
+
+    UrlFetchApp.fetch(slackUrl, options);
+  }
+}
