@@ -1,0 +1,93 @@
+function NotificarWhatsappCliente() {
+  var webhookURL = 'link do webhook';
+  var sheetName = 'nome da aba da planilha';
+  var startRow = 2; // Começa na segunda linha para ignorar o cabeçalho csv
+  
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  var lastRow = sheet.getLastRow();
+  var lastColumn = sheet.getLastColumn();
+  var headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0]; // Obter cabeçalhos da primeira linha
+  
+  for (var i = startRow; i <= lastRow; i++) {
+    var rowData = sheet.getRange(i, 1, 1, lastColumn).getValues()[0];
+    var payload = {};
+    
+    for (var j = 0; j < headers.length; j++) {
+      payload[headers[j]] = rowData[j];
+    }
+    
+    var options = {
+      method: 'post',
+      contentType: 'application/json',
+      payload: JSON.stringify(payload)
+    };
+    
+    UrlFetchApp.fetch(webhookURL, options);
+  }
+}
+
+function getRowCountMessage() {
+  var sheetName = 'nome da aba da planilha';
+  var startRow = 2; // Começa na segunda linha para ignorar o cabeçalho
+  
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  var lastRow = sheet.getLastRow() - (startRow - 1); // Subtrai a linha do cabeçalho
+  return lastRow + " notificações enviadas para comunicar pedidos realizados.";
+}
+
+function enviarAlertaSlack() {
+  var slackUrl1 = "slck webhook";
+  var sheetName = 'nome da aba';
+  var startRow = 2; // Começa na segunda linha para ignorar o cabeçalho
+  
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(sheetName);
+  var lastRow = sheet.getLastRow() - (startRow - 1); // Subtrai a linha do cabeçalho
+  var dataRange = sheet.getRange(startRow, 1, lastRow, sheet.getLastColumn());
+  var csvcontent = convertRangeToCsv(dataRange);
+
+  var payload1 = {
+    "text": getRowCountMessage(),
+    "icon_emoji": ":incoming_envelope:", // emoji que quiser usar pro slack
+    "username": "nome que quiser aqui",
+    "attachments": [
+      {
+        "text": "Conteúdo em CSV:",
+        "fallback": "CSV Content",
+        "title": "título que quiser aqui",
+        "attachment_type": "file",
+        "color": "#0077B5",
+        "actions": [
+          {
+            "type": "button",
+            "text": "Clique Aqui",
+            "url": getFileUrl(csvcontent), // Chama a função para criar o link do arquivo
+            "style": "primary"
+          }
+        ]
+      }
+    ]
+  };
+
+  // Use a função UrlFetchApp para enviar a mensagem para o Slack
+  var options1 = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(payload1)
+  };
+  UrlFetchApp.fetch(slackUrl1, options1);
+}
+function getFileUrl(content) {
+  var folder = DriveApp.getFolderById('código da pasta que quiser usar para salvar'); 
+  var timestamp = new Date().getTime(); // Gera um timestamp único
+  var file = folder.createFile('data_' + timestamp + '.csv', content, MimeType.CSV); // Nome do arquivo com timestamp
+  return file.getUrl();
+}
+
+function convertRangeToCsv(range) {
+  var values = range.getValues();
+  var csvRows = [];
+  for (var i = 0; i < values.length; i++) {
+    csvRows.push(values[i].join(","));
+  }
+  return csvRows.join("\n");
+}
